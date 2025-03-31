@@ -3,71 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ skill.skill_name }} - Step {{ step_index + 1 }} - Gemini Learning Assistant</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>{{ skill.skill_name }} - Step {{ step_index + 1 }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* Additional styles for MCQ quiz */
+        .quiz-modal, .congratulation-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .question-container {
+            margin: 20px 0;
+        }
+        
+        .question-text {
+            font-size: 18px;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .option-label {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .option-label:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .option-label input {
+            margin-right: 10px;
+        }
+        
+        .feedback {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .feedback.correct {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .feedback.incorrect {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .score-text {
+            font-size: 20px;
+            font-weight: 500;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        
+        .button:hover {
+            background-color: #0069d9;
+        }
+        
+        .quiz-button {
+            margin-top: 20px;
+            display: inline-block;
+        }
+        
+        .mcq-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Gemini Learning Assistant</h1>
-        </header>
-        
         <div class="step-detail">
-            <div class="skill-info">
-                <h2>{{ skill.skill_name }} - Step {{ step_index + 1 }}/{{ skill.steps|length }}</h2>
-                <h3>{{ step.title }}</h3>
+            <h2>{{ skill.skill_name }} - Step {{ step_index + 1 }}/{{ skill.steps|length }}</h2>
+            <h3>{{ step.title }}</h3>
+            
+            <div class="section">
+                <h4>Explanation</h4>
+                <p>{{ step.explanation|safe }}</p>
             </div>
             
-            <div class="step-content">
-                <div class="explanation">
-                    <h4>Explanation</h4>
-                    <div class="content">{{ step.explanation|safe }}</div>
-                </div>
-                
-                <div class="exercise">
-                    <h4>Exercise</h4>
-                    <div class="content">{{ step.exercise|safe }}</div>
-                </div>
-                
-                <div class="tip">
-                    <h4>Tip</h4>
-                    <div class="content">{{ step.tip|safe }}</div>
-                </div>
+            <div class="section">
+                <h4>Exercise</h4>
+                <p>{{ step.exercise|safe }}</p>
+            </div>
+            
+            <div class="section">
+                <h4>Tip</h4>
+                <p>{{ step.tip|safe }}</p>
             </div>
             
             {% if step.sub_steps and step.sub_steps|length > 0 %}
-                <div class="sub-steps">
-                    <h4>Sub-steps</h4>
-                    {% for sub_step in step.sub_steps %}
-                        <div class="sub-step">
-                            <h5>{{ sub_step.title }}</h5>
-                            <div class="sub-step-content">
-                                <div class="explanation">
-                                    <h6>Explanation</h6>
-                                    <div class="content">{{ sub_step.explanation|safe }}</div>
-                                </div>
-                                
-                                <div class="exercise">
-                                    <h6>Exercise</h6>
-                                    <div class="content">{{ sub_step.exercise|safe }}</div>
-                                </div>
-                                
-                                <div class="tip">
-                                    <h6>Tip</h6>
-                                    <div class="content">{{ sub_step.tip|safe }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    {% endfor %}
+            <div class="sub-steps">
+                <h4>Sub-steps</h4>
+                {% for sub_step in step.sub_steps %}
+                <div class="sub-step">
+                    <h5>{{ sub_step.title }}</h5>
+                    <p><strong>Explanation:</strong> {{ sub_step.explanation|safe }}</p>
+                    <p><strong>Exercise:</strong> {{ sub_step.exercise|safe }}</p>
+                    <p><strong>Tip:</strong> {{ sub_step.tip|safe }}</p>
                 </div>
+                {% endfor %}
+            </div>
             {% endif %}
-        </div>
-        
-        <div class="navigation">
-            <!-- Navigation buttons will be dynamically inserted here by JavaScript -->
+            
+            <div class="navigation">
+                {% if prev_step_index is not none %}
+                <a href="/step/{{ skill.skill_name }}/{{ prev_step_index }}" class="button prev-button">Previous Step</a>
+                {% endif %}
+                
+                <a href="/skill/{{ skill.skill_name }}" class="button back-button">Back to Skill Overview</a>
+                
+                {% if next_step_index is not none %}
+                <a href="/step/{{ skill.skill_name }}/{{ next_step_index }}" class="button next-button">Next Step</a>
+                {% endif %}
+                
+                <button id="mark-complete-btn" class="button complete-button">Mark as Complete</button>
+            </div>
         </div>
     </div>
     
-    <script src="{{ url_for('static', filename='js/step-navigation.js') }}"></script>
+    <script src="/static/js/step-navigation.js"></script>
 </body>
 </html>

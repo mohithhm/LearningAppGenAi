@@ -14,34 +14,33 @@ class GeminiClient:
     def send_prompt(self, prompt, model="gemini-2.0-flash", max_tokens=2500, temperature=0.7):
         try:
             url = f"{self.base_url}/{model}:generateContent?key={self.api_key}"
-        
             # Enhanced system prompt with stronger JSON formatting instructions and size restriction
             system_prompt = """You are an educational AI assistant.
-IMPORTANT: Your ENTIRE response must be ONLY a valid JSON object.
-DO NOT include explanations, markdown formatting, code blocks, or any text outside the JSON.
-Keep your response concise to avoid truncation. Limit to 8-10 steps maximum.
-Respond with ONLY this JSON structure:
-{
-    "skill_name": "Skill Name",
-    "description": "Brief description",
-    "steps": [
-        {
-            "title": "Step title",
-            "explanation": "Short explanation (1-2 sentences)",
-            "exercise": "Brief exercise",
-            "tip": "Short tip",
-            "sub_steps": [
-                {
-                    "title": "Sub-step title",
-                    "explanation": "Short sub-step explanation",
-                    "exercise": "Brief sub-step exercise",
-                    "tip": "Short sub-step tip"
-                }
-            ]
-        }
-    ]
-}"""
+            IMPORTANT: Your ENTIRE response must be ONLY a valid JSON object.
+            DO NOT include explanations, markdown formatting, code blocks, or any text outside the JSON.
+            Keep your response concise to avoid truncation. Limit to 8-10 steps maximum.
+            Respond with ONLY this JSON structure:
 
+            {
+                "skill_name": "Skill Name",
+                "description": "Brief description",
+                "steps": [
+                    {
+                        "title": "Step title",
+                        "explanation": "Short explanation (1-2 sentences)",
+                        "exercise": "Brief exercise",
+                        "tip": "Short tip",
+                        "sub_steps": [
+                            {
+                                "title": "Sub-step title",
+                                "explanation": "Short sub-step explanation",
+                                "exercise": "Brief sub-step exercise",
+                                "tip": "Short sub-step tip"
+                            }
+                        ]
+                    }
+                ]
+            }"""
             payload = {
                 "contents": [
                     {
@@ -56,39 +55,33 @@ Respond with ONLY this JSON structure:
                     "topK": 40
                 }
             }
-
             response = requests.post(url, json=payload)
             response.raise_for_status()
-            print("Raw API Response:", response.text)  # Debug logging
-        
+            print("Raw API Response:", response.text) # Debug logging
             response_data = response.json()
-        
             if "candidates" not in response_data or not response_data["candidates"]:
                 return {"error": "No valid response generated"}
-
+            
             # Check if the response was truncated
             finish_reason = response_data["candidates"][0].get("finishReason", "")
             if finish_reason == "MAX_TOKENS":
                 print("WARNING: Response was truncated due to MAX_TOKENS limit")
-                
+            
             # Extract the text response
             text_response = response_data["candidates"][0]["content"]["parts"][0]["text"]
-            print("Text Response:", text_response)  # Additional debug logging
-        
+            print("Text Response:", text_response) # Additional debug logging
+            
             # Improved JSON parsing with better error handling
             try:
                 # More robust cleaning of the response
                 cleaned_response = text_response.strip()
-                
                 # Remove any code block markers or markdown formatting
-                if cleaned_response.startswith("```json"):
-                    cleaned_response = cleaned_response[7:]
+                if cleaned_response.startswith("```"):
+                    cleaned_response = cleaned_response[3:]
                 elif cleaned_response.startswith("```"):
                     cleaned_response = cleaned_response[3:]
-                    
                 if cleaned_response.endswith("```"):
                     cleaned_response = cleaned_response[:-3]
-                    
                 cleaned_response = cleaned_response.strip()
                 
                 # If the response is empty after cleaning, return an error
@@ -103,14 +96,12 @@ Respond with ONLY this JSON structure:
                     except json.JSONDecodeError as e:
                         # If it fails, try to repair the JSON
                         cleaned_response = self._repair_truncated_json(cleaned_response)
-                    
+                
                 # Parse the JSON
                 return json.loads(cleaned_response)
-                
             except json.JSONDecodeError as e:
                 print(f"JSON Parse Error: {str(e)}")
                 print("Cleaned Response:", cleaned_response)
-                
                 # Try to extract JSON from the response if it contains mixed content
                 try:
                     # Look for JSON object pattern
@@ -121,17 +112,15 @@ Respond with ONLY this JSON structure:
                         return json.loads(potential_json)
                 except:
                     pass
-                    
                 return {
                     "error": f"JSON parsing failed: {str(e)}",
                     "raw_response": text_response
                 }
-
         except requests.exceptions.RequestException as e:
             return {"error": f"API Error: {str(e)}"}
         except Exception as e:
             return {"error": f"Unexpected Error: {str(e)}"}
-    
+
     def _repair_truncated_json(self, json_str):
         """Attempt to repair a truncated JSON string by balancing brackets"""
         # Count opening and closing brackets, braces, and quotes
@@ -143,31 +132,85 @@ Respond with ONLY this JSON structure:
         # If we have unbalanced quotes, find the last complete object
         if open_braces > close_braces or open_brackets > close_brackets:
             print(f"Attempting to repair truncated JSON. Imbalance detected: {open_braces}:{close_braces} braces, {open_brackets}:{close_brackets} brackets")
-            
             # Find the last complete object by working backwards
             # First, ensure we have a valid starting structure
             if not json_str.strip().startswith('{'):
-                return json_str  # Can't repair if it doesn't start properly
-                
+                return json_str # Can't repair if it doesn't start properly
+            
             # Try to find the last valid position
             repaired = json_str
-            
             # Add missing closing brackets and braces
             for _ in range(open_brackets - close_brackets):
                 repaired += "]"
-            
             for _ in range(open_braces - close_braces):
                 repaired += "}"
-                
             return repaired
-            
-        return json_str  # Return original if it seems balanced
+        return json_str # Return original if it seems balanced
 
+class MCQGenerator:
+    def __init__(self, gemini_client):
+        self.gemini_client = gemini_client
+
+    def generate_mcqs(self, step_content):
+        prompt = f"""
+        Based on the following educational content, create 3 multiple-choice questions that test understanding of key concepts.
+
+        CONTENT:
+
+        {step_content}
+
+        FORMAT YOUR RESPONSE AS JSON WITH THE FOLLOWING STRUCTURE:
+
+        {{
+            "questions": [
+                {{
+                    "question": "Question text here?",
+                    "options": ["Option A", "Option B", "Option C", "Option D"],
+                    "correctIndex": 0,
+                    "explanation": "Brief explanation of why this answer is correct"
+                }}
+            ]
+        }}
+
+        Make sure each question has EXACTLY 4 options. The correctIndex should be the index (0-3) of the correct answer.
+
+        Keep questions and answers concise. Focus on testing understanding, not just memorization.
+
+        Your response MUST be valid JSON only.
+        """
+
+        response = self.gemini_client.send_prompt(prompt, max_tokens=1500, temperature=0.3)
+        # Handle possible errors
+        if isinstance(response, dict) and "error" in response:
+            print(f"Error in MCQ generation: {response['error']}")
+            return {"questions": []}
+
+        # Ensure we have the expected structure
+        if not isinstance(response, dict) or "questions" not in response:
+            print(f"Unexpected MCQ response structure: {response}")
+            # Try to create a default structure with empty questions
+            return {"questions": []}
+
+        # Validate each question has the required fields
+        valid_questions = []
+        for q in response.get("questions", []):
+            if not all(k in q for k in ["question", "options", "correctIndex"]):
+                print(f"Skipping invalid question format: {q}")
+                continue
+
+            # Ensure correctIndex is valid
+            if not isinstance(q["correctIndex"], int) or q["correctIndex"] < 0 or q["correctIndex"] >= len(q.get("options", [])):
+                q["correctIndex"] = 0
+            valid_questions.append(q)
+
+        return {"questions": valid_questions}
 
 # Flask App Setup
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.secret_key = os.getenv("SECRET_KEY", "dev_secret_key")
+
 gemini_client = GeminiClient()
+mcq_generator = MCQGenerator(gemini_client)
 
 # Directory for storing user data locally
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_data")
@@ -194,13 +237,10 @@ def save_user_data(data, user_id="default"):
 def update_streak(user_id="default"):
     user_data = load_user_data(user_id)
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    
     if "streaks" not in user_data:
         user_data["streaks"] = []
-    
     if user_data.get("last_active") == today:
         return len(user_data["streaks"])
-    
     if user_data.get("last_active"):
         last_active_date = datetime.datetime.strptime(user_data["last_active"], "%Y-%m-%d")
         today_date = datetime.datetime.strptime(today, "%Y-%m-%d")
@@ -210,7 +250,6 @@ def update_streak(user_id="default"):
             user_data["streaks"] = [today]
     else:
         user_data["streaks"].append(today)
-    
     user_data["last_active"] = today
     save_user_data(user_data, user_id)
     return len(user_data["streaks"])
@@ -234,12 +273,10 @@ def learn():
 def generate_skill_plan(skill):
     user_id = session.get('user_id', 'default')
     learning_plan = gemini_client.send_prompt(skill)
-    
     if "error" in learning_plan:
         return render_template('error.html', error=learning_plan["error"])
     
     user_data = load_user_data(user_id)
-    
     for step in learning_plan.get("steps", []):
         step["progress"] = 0
         step["status"] = "not_started"
@@ -254,9 +291,8 @@ def generate_skill_plan(skill):
     learning_plan["created_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     existing_skills = [s for s in user_data.get("skills", []) if s.get("skill_name") == learning_plan.get("skill_name")]
-    
     if existing_skills:
-        existing_skills[0].update(learning_plan)
+        existing_skills.update(learning_plan)
     else:
         user_data.setdefault("skills", []).append(learning_plan)
     
@@ -267,21 +303,16 @@ def generate_skill_plan(skill):
 def view_skill(skill_id):
     user_id = session.get('user_id', 'default')
     user_data = load_user_data(user_id)
-    
     skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
-    
     if not skill:
         return render_template('error.html', error="Skill not found")
-    
     return render_template('skill.html', skill=skill)
 
 @app.route('/step/<skill_id>/<int:step_index>')
 def view_step(skill_id, step_index):
     user_id = session.get('user_id', 'default')
     user_data = load_user_data(user_id)
-    
     skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
-    
     if not skill or step_index >= len(skill.get("steps", [])):
         return render_template('error.html', error="Step not found")
     
@@ -304,12 +335,9 @@ def check_step_exists(skill_id, step_index):
     """Check if a step exists for the given skill"""
     user_id = session.get('user_id', 'default')
     user_data = load_user_data(user_id)
-    
     skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
-    
     if not skill or step_index >= len(skill.get("steps", [])):
         return jsonify({"exists": False})
-    
     return jsonify({"exists": True})
 
 # Modify the update_progress function to handle completion status better
@@ -317,22 +345,19 @@ def check_step_exists(skill_id, step_index):
 def update_progress():
     data = request.json
     skill_id, step_index, substep_index, status = data.get('skill_id'), data.get('step_index'), data.get('substep_index'), data.get('status')
-    
     user_id = session.get('user_id', 'default')
     user_data = load_user_data(user_id)
-    
     skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
-    
     if not skill or int(step_index) >= len(skill.get("steps", [])):
         return jsonify({"error": "Invalid skill or step index"})
-    
+
     step = skill["steps"][int(step_index)]
     step["status"] = status
-    
+
     if substep_index is not None and int(substep_index) < len(step.get("sub_steps", [])):
         sub_step = step["sub_steps"][int(substep_index)]
         sub_step["status"] = status
-    
+
     # Calculate step progress based on substeps
     if step.get("sub_steps") and len(step["sub_steps"]) > 0:
         completed_substeps = sum(1 for sub in step["sub_steps"] if sub.get("status") == "completed")
@@ -345,21 +370,43 @@ def update_progress():
             step["progress"] = 50
         elif status == "completed":
             step["progress"] = 100
-    
+
     # Calculate overall progress
     completed_steps = sum(1 for s in skill["steps"] if s.get("status") == "completed")
     in_progress_steps = sum(1 for s in skill["steps"] if s.get("status") == "in_progress")
-    
     total_steps = len(skill["steps"])
     skill["overall_progress"] = int(((completed_steps + (in_progress_steps * 0.5)) / total_steps) * 100)
-    
+
     save_user_data(user_data, user_id)
-    
     return jsonify({
         "success": True,
         "step_progress": step["progress"],
         "overall_progress": skill["overall_progress"]
     })
+
+@app.route('/get-mcqs/<skill_id>/<int:step_index>')
+def get_mcqs(skill_id, step_index):
+    user_id = session.get('user_id', 'default')
+    user_data = load_user_data(user_id)
+    
+    skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
+    
+    if not skill or step_index >= len(skill.get("steps", [])):
+        return jsonify({"questions": []})
+    
+    step = skill["steps"][step_index]
+    
+    # Generate MCQs if not already present
+    if "mcqs" not in step or not step["mcqs"].get("questions"):
+        mcqs = mcq_generator.generate_mcqs(f"{step['title']} {step['explanation']} {step['exercise']} {step['tip']}")
+        
+        if not isinstance(mcqs, dict) or not isinstance(mcqs.get("questions", []), list):
+            mcqs = {"questions": []}
+        
+        step["mcqs"] = mcqs
+        save_user_data(user_data, user_id)
+    
+    return jsonify(step["mcqs"])
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
