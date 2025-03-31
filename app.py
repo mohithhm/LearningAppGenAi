@@ -3,7 +3,7 @@ import json
 import requests
 import datetime
 import re
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, redirect, send_file, url_for, session
 
 # Gemini API Client
 class GeminiClient:
@@ -19,7 +19,7 @@ class GeminiClient:
             system_prompt = """You are an educational AI assistant.
 IMPORTANT: Your ENTIRE response must be ONLY a valid JSON object.
 DO NOT include explanations, markdown formatting, code blocks, or any text outside the JSON.
-Keep your response concise to avoid truncation. Limit to 2-3 steps maximum.
+Keep your response concise to avoid truncation. Limit to 8-10 steps maximum.
 Respond with ONLY this JSON structure:
 {
     "skill_name": "Skill Name",
@@ -294,6 +294,25 @@ def view_step(skill_id, step_index):
                            next_step_index=next_step_index,
                            prev_step_index=prev_step_index)
 
+@app.route('/static/js/step-navigation.js')
+def step_navigation_js():
+    """Serve the new step navigation JavaScript file"""
+    return send_file('static/js/step-navigation.js')
+
+@app.route('/check-step/<skill_id>/<int:step_index>')
+def check_step_exists(skill_id, step_index):
+    """Check if a step exists for the given skill"""
+    user_id = session.get('user_id', 'default')
+    user_data = load_user_data(user_id)
+    
+    skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
+    
+    if not skill or step_index >= len(skill.get("steps", [])):
+        return jsonify({"exists": False})
+    
+    return jsonify({"exists": True})
+
+# Modify the update_progress function to handle completion status better
 @app.route('/update-progress', methods=['POST'])
 def update_progress():
     data = request.json
@@ -304,18 +323,43 @@ def update_progress():
     
     skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
     
-    if not skill or step_index >= len(skill.get("steps", [])):
-        return jsonify({"error": "Invalid step or substep index"})
+    if not skill or int(step_index) >= len(skill.get("steps", [])):
+        return jsonify({"error": "Invalid skill or step index"})
     
     step = skill["steps"][int(step_index)]
+    step["status"] = status
     
-    if substep_index is not None and substep_index < len(step.get("sub_steps", [])):
+    if substep_index is not None and int(substep_index) < len(step.get("sub_steps", [])):
         sub_step = step["sub_steps"][int(substep_index)]
         sub_step["status"] = status
     
+    # Calculate step progress based on substeps
+    if step.get("sub_steps") and len(step["sub_steps"]) > 0:
+        completed_substeps = sum(1 for sub in step["sub_steps"] if sub.get("status") == "completed")
+        step["progress"] = int((completed_substeps / len(step["sub_steps"])) * 100)
+    else:
+        # If no substeps, set to 0%, 50%, or 100% based on status
+        if status == "not_started":
+            step["progress"] = 0
+        elif status == "in_progress":
+            step["progress"] = 50
+        elif status == "completed":
+            step["progress"] = 100
+    
+    # Calculate overall progress
+    completed_steps = sum(1 for s in skill["steps"] if s.get("status") == "completed")
+    in_progress_steps = sum(1 for s in skill["steps"] if s.get("status") == "in_progress")
+    
+    total_steps = len(skill["steps"])
+    skill["overall_progress"] = int(((completed_steps + (in_progress_steps * 0.5)) / total_steps) * 100)
+    
     save_user_data(user_data, user_id)
     
-    return jsonify({"success": True})
+    return jsonify({
+        "success": True,
+        "step_progress": step["progress"],
+        "overall_progress": skill["overall_progress"]
+    })
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
