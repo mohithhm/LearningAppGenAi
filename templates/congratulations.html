@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Congratulations - Gemini Learning Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="congratulations-page">
+            <h1>Congratulations!</h1>
+            <p>You have successfully completed the skill:</p>
+            <h2>{{ skill.skill_name }}</h2>
+            
+            <div class="completion-details">
+                <p>{{ skill.description }}</p>
+                <div class="progress-bar">
+                    <div class="progress" style="width: 100%;"></div>
+                </div>
+                <p class="progress-text">100%</p>
+            </div>
+            
+            <div class="achievement">
+                <p>🏆 Achievement Unlocked: Skill Master</p>
+            </div>
+            
+            <a href="/" class="button home-button">Return to Home</a>
+        </div>
+    </div>
+</body>
+</html>

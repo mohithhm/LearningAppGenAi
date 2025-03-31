@@ -39,12 +39,13 @@ function getStepIndexFromUrl() {
     return null;
 }
 
+// Modify the updateProgress function in script.js to ensure UI updates
 function updateProgress(skillId, stepIndex, substepIndex, status) {
     if (!skillId || !stepIndex) {
         console.error('Missing skill ID or step index');
         return;
     }
-    
+
     const data = {
         skill_id: skillId,
         step_index: stepIndex,
@@ -54,7 +55,10 @@ function updateProgress(skillId, stepIndex, substepIndex, status) {
     if (substepIndex !== null && substepIndex !== undefined) {
         data.substep_index = substepIndex;
     }
-    
+
+    // Log the data being sent for debugging
+    console.log('Sending progress update:', data);
+
     fetch('/update-progress', {
         method: 'POST',
         headers: {
@@ -64,22 +68,23 @@ function updateProgress(skillId, stepIndex, substepIndex, status) {
     })
     .then(response => response.json())
     .then(data => {
+        // Log the response for debugging
+        console.log('Progress update response:', data);
+        
         if (data.error) {
             console.error('Error updating progress:', data.error);
             return;
         }
-        
-        // Update UI to reflect new progress
-        const progressBars = document.querySelectorAll('.progress-bar .progress');
-        const progressTexts = document.querySelectorAll('.progress-text');
-        const statusLabels = document.querySelectorAll('.status');
-        
-        // Update overall progress if available
+
+        // Force immediate update of progress bars
         if (data.overall_progress !== undefined) {
             const overallProgressBar = document.querySelector('.skill-overview .progress-bar .progress');
             const overallProgressText = document.querySelector('.skill-overview .progress-text');
             
             if (overallProgressBar) {
+                // Force reflow to update immediately
+                overallProgressBar.style.width = '0%';
+                overallProgressBar.offsetHeight; // Force reflow
                 overallProgressBar.style.width = `${data.overall_progress}%`;
             }
             
@@ -88,12 +93,14 @@ function updateProgress(skillId, stepIndex, substepIndex, status) {
             }
         }
         
-        // Update step progress if available
         if (data.step_progress !== undefined) {
             const stepProgressBar = document.querySelector('.step-detail .progress-bar .progress');
             const stepProgressText = document.querySelector('.step-detail .progress-text');
             
             if (stepProgressBar) {
+                // Force reflow to update immediately
+                stepProgressBar.style.width = '0%';
+                stepProgressBar.offsetHeight; // Force reflow
                 stepProgressBar.style.width = `${data.step_progress}%`;
             }
             
@@ -105,7 +112,7 @@ function updateProgress(skillId, stepIndex, substepIndex, status) {
         // Highlight active status button
         highlightActiveStatusButtons();
         
-        // If completed, show a success message
+        // Show success message
         if (status === 'completed') {
             showSuccessMessage('Progress updated! Great job completing this step.');
         } else if (status === 'in_progress') {
@@ -113,9 +120,10 @@ function updateProgress(skillId, stepIndex, substepIndex, status) {
         }
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('Error updating progress:', error);
     });
 }
+
 
 function highlightActiveStatusButtons() {
     // Get current status from the page

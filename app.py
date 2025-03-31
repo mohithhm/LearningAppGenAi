@@ -153,57 +153,76 @@ class MCQGenerator:
 
     def generate_mcqs(self, step_content):
         prompt = f"""
-        Based on the following educational content, create 3 multiple-choice questions that test understanding of key concepts.
-
-        CONTENT:
-
-        {step_content}
-
-        FORMAT YOUR RESPONSE AS JSON WITH THE FOLLOWING STRUCTURE:
-
-        {{
-            "questions": [
-                {{
-                    "question": "Question text here?",
-                    "options": ["Option A", "Option B", "Option C", "Option D"],
-                    "correctIndex": 0,
-                    "explanation": "Brief explanation of why this answer is correct"
-                }}
-            ]
-        }}
-
-        Make sure each question has EXACTLY 4 options. The correctIndex should be the index (0-3) of the correct answer.
-
-        Keep questions and answers concise. Focus on testing understanding, not just memorization.
-
-        Your response MUST be valid JSON only.
-        """
-
+    Based on the following educational content, create 3 multiple-choice questions that test understanding of key concepts.
+    
+    CONTENT:
+    {step_content}
+    
+    FORMAT YOUR RESPONSE AS JSON WITH THE FOLLOWING STRUCTURE ONLY:
+    {{
+        "questions": [
+            {{
+                "question": "Question text here?",
+                "options": ["Option A", "Option B", "Option C", "Option D"],
+                "correctIndex": 0,
+                "explanation": "Brief explanation of why this answer is correct"
+            }}
+        ]
+    }}
+    
+    IMPORTANT: Your response MUST be a valid JSON object containing ONLY a 'questions' array.
+    Make sure each question has EXACTLY 4 options. The correctIndex should be the index (0-3) of the correct answer.
+    """
+    
         response = self.gemini_client.send_prompt(prompt, max_tokens=1500, temperature=0.3)
-        # Handle possible errors
-        if isinstance(response, dict) and "error" in response:
-            print(f"Error in MCQ generation: {response['error']}")
-            return {"questions": []}
+    
+         # Handle possible errors or unexpected response structure
+        if isinstance(response, dict):
+            if "error" in response:
+                print(f"Error in MCQ generation: {response['error']}")
+                return {"questions": []}
+            elif "questions" in response:
+            # We have the expected structure
+                valid_questions = []
+                for q in response.get("questions", []):
+                    if not all(k in q for k in ["question", "options", "correctIndex"]):
+                        print(f"Skipping invalid question format: {q}")
+                        continue
+                # Ensure correctIndex is valid
+                    if not isinstance(q["correctIndex"], int) or q["correctIndex"] < 0 or q["correctIndex"] >= len(q.get("options", [])):
+                        q["correctIndex"] = 0
+                    valid_questions.append(q)
+                return {"questions": valid_questions}
+            else:
+            # Unexpected response structure - create default questions based on content
+                print(f"Unexpected MCQ response structure: {response}")
+                return self._create_default_questions(step_content)
+    
+    # If we get here, something went wrong
+        print(f"Invalid response type from MCQ generation: {type(response)}")
+        return {"questions": []}
 
-        # Ensure we have the expected structure
-        if not isinstance(response, dict) or "questions" not in response:
-            print(f"Unexpected MCQ response structure: {response}")
-            # Try to create a default structure with empty questions
-            return {"questions": []}
+def _create_default_questions(self, content):
+    """Create basic default questions when API fails to return proper format"""
+    # Extract title if available in content
+    title = content.split('\n')[0] if '\n' in content else "This topic"
+    
+    return {
+        "questions": [
+            {
+                "question": f"What is the main purpose of {title}?",
+                "options": [
+                    "To understand core concepts", 
+                    "To practice implementation", 
+                    "To learn advanced techniques", 
+                    "To debug common issues"
+                ],
+                "correctIndex": 0,
+                "explanation": "Understanding core concepts is the foundation of learning."
+            }
+        ]
+    }
 
-        # Validate each question has the required fields
-        valid_questions = []
-        for q in response.get("questions", []):
-            if not all(k in q for k in ["question", "options", "correctIndex"]):
-                print(f"Skipping invalid question format: {q}")
-                continue
-
-            # Ensure correctIndex is valid
-            if not isinstance(q["correctIndex"], int) or q["correctIndex"] < 0 or q["correctIndex"] >= len(q.get("options", [])):
-                q["correctIndex"] = 0
-            valid_questions.append(q)
-
-        return {"questions": valid_questions}
 
 # Flask App Setup
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -345,68 +364,107 @@ def check_step_exists(skill_id, step_index):
 def update_progress():
     data = request.json
     skill_id, step_index, substep_index, status = data.get('skill_id'), data.get('step_index'), data.get('substep_index'), data.get('status')
+    
     user_id = session.get('user_id', 'default')
     user_data = load_user_data(user_id)
+    
     skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
     if not skill or int(step_index) >= len(skill.get("steps", [])):
         return jsonify({"error": "Invalid skill or step index"})
-
+    
     step = skill["steps"][int(step_index)]
     step["status"] = status
-
+    
+    # Handle substep progress if applicable
     if substep_index is not None and int(substep_index) < len(step.get("sub_steps", [])):
         sub_step = step["sub_steps"][int(substep_index)]
         sub_step["status"] = status
-
-    # Calculate step progress based on substeps
-    if step.get("sub_steps") and len(step["sub_steps"]) > 0:
-        completed_substeps = sum(1 for sub in step["sub_steps"] if sub.get("status") == "completed")
-        step["progress"] = int((completed_substeps / len(step["sub_steps"])) * 100)
+        
+        # Calculate step progress based on substeps
+        if step.get("sub_steps") and len(step["sub_steps"]) > 0:
+            completed_substeps = sum(1 for sub in step["sub_steps"] if sub.get("status") == "completed")
+            in_progress_substeps = sum(1 for sub in step["sub_steps"] if sub.get("status") == "in_progress")
+            total_substeps = len(step["sub_steps"])
+            
+            # Calculate weighted progress (completed = 100%, in_progress = 50%)
+            step["progress"] = int(((completed_substeps + (in_progress_substeps * 0.5)) / total_substeps) * 100)
     else:
-        # If no substeps, set to 0%, 50%, or 100% based on status
+        # If no substeps, set progress based on status
         if status == "not_started":
             step["progress"] = 0
         elif status == "in_progress":
             step["progress"] = 50
         elif status == "completed":
             step["progress"] = 100
-
-    # Calculate overall progress
+    
+    # Calculate overall progress with weighted values
+    total_steps = len(skill["steps"])
     completed_steps = sum(1 for s in skill["steps"] if s.get("status") == "completed")
     in_progress_steps = sum(1 for s in skill["steps"] if s.get("status") == "in_progress")
-    total_steps = len(skill["steps"])
+    
+    # Calculate weighted progress (completed = 100%, in_progress = 50%)
     skill["overall_progress"] = int(((completed_steps + (in_progress_steps * 0.5)) / total_steps) * 100)
-
+    
     save_user_data(user_data, user_id)
+    
     return jsonify({
         "success": True,
         "step_progress": step["progress"],
         "overall_progress": skill["overall_progress"]
     })
 
-@app.route('/get-mcqs/<skill_id>/<int:step_index>')
+
+@app.route('/get-mcqs/<skill_id>/<step_index>')
 def get_mcqs(skill_id, step_index):
     user_id = session.get('user_id', 'default')
     user_data = load_user_data(user_id)
     
-    skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
-    
-    if not skill or step_index >= len(skill.get("steps", [])):
+    try:
+        step_index = int(step_index)
+        skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
+        
+        if not skill or step_index >= len(skill.get("steps", [])):
+            return jsonify({"questions": []})
+        
+        step = skill["steps"][step_index]
+        
+        # Generate MCQs if not already present
+        if "mcqs" not in step or not step.get("mcqs", {}).get("questions"):
+            step_content = f"{step.get('title', '')} {step.get('explanation', '')} {step.get('exercise', '')} {step.get('tip', '')}"
+            mcqs = mcq_generator.generate_mcqs(step_content)
+            
+            # Ensure we have a valid questions array
+            if not isinstance(mcqs, dict):
+                mcqs = {"questions": []}
+            elif not isinstance(mcqs.get("questions", []), list):
+                mcqs = {"questions": []}
+                
+            step["mcqs"] = mcqs
+            save_user_data(user_data, user_id)
+        
+        return jsonify(step.get("mcqs", {"questions": []}))
+    except Exception as e:
+        print(f"Error generating MCQs: {str(e)}")
         return jsonify({"questions": []})
+@app.route('/congratulations/<skill_id>')
+def congratulations(skill_id):
+    user_id = session.get('user_id', 'default')
+    user_data = load_user_data(user_id)
     
-    step = skill["steps"][step_index]
+    skill = next((s for s in user_data.get("skills", []) if s.get("skill_name") == skill_id), None)
+    if not skill:
+        return render_template('error.html', error="Skill not found")
     
-    # Generate MCQs if not already present
-    if "mcqs" not in step or not step["mcqs"].get("questions"):
-        mcqs = mcq_generator.generate_mcqs(f"{step['title']} {step['explanation']} {step['exercise']} {step['tip']}")
-        
-        if not isinstance(mcqs, dict) or not isinstance(mcqs.get("questions", []), list):
-            mcqs = {"questions": []}
-        
-        step["mcqs"] = mcqs
-        save_user_data(user_data, user_id)
+    # Ensure skill is marked as 100% complete
+    skill["overall_progress"] = 100
+    for step in skill.get("steps", []):
+        step["status"] = "completed"
+        step["progress"] = 100
     
-    return jsonify(step["mcqs"])
+    save_user_data(user_data, user_id)
+    
+    return render_template('congratulations.html', skill=skill)
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
