@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ skill.skill_name }} - Gemini Learning Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gemini Learning Assistant</h1>
+        </header>
+        
+        <div class="skill-overview">
+            <h2>{{ skill.skill_name }}</h2>
+            <p>{{ skill.description }}</p>
+            
+            <div class="progress-container">
+                <h3>Overall Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress" style="width: '{{ skill.overall_progress | default(0) }}%'"></div>
+                </div>
+                <span class="progress-text">{{ skill.overall_progress }}%</span>
+            </div>
+        </div>
+        
+        <div class="learning-steps">
+            <h3>Learning Steps</h3>
+            {% for step in skill.steps %}
+                <div class="step-card">
+                    <h4>{{ step.title }}</h4>
+                    <div class="step-status">
+                        {% if step.status == 'completed' %}
+                            <span class="status completed">Completed</span>
+                        {% elif step.status == 'in_progress' %}
+                            <span class="status in-progress">In Progress</span>
+                        {% else %}
+                            <span class="status not-started">Not Started</span>
+                        {% endif %}
+                        <div class="progress-bar">
+                            <div class="progress" style="width: '{{ step.progress }}%';"></div>
+                        </div>
+                        <span class="progress-text">{{ step.progress }}%</span>
+                    </div>
+                    <a href="{{ url_for('view_step', skill_id=skill.skill_name, step_index=loop.index0) }}" class="button">View Step</a>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <div class="navigation">
+            <a href="{{ url_for('index') }}" class="back-button">Back to Home</a>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Learning Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container main-container">
+        <div class="logo">Gemini Learning Assistant</div>
+        
+        {% if streak > 0 %}
+        <div class="streak-counter">
+            <h5>🔥 {{ streak }} Day Streak!</h5>
+        </div>
+        {% endif %}
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <a href="{{ url_for('learn') }}" class="text-decoration-none">
+                    <div class="option-box new-skill">
+                        <h3>Learn a New Skill</h3>
+                        <p>Start your journey with a new skill</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6">
+                <div class="option-box continue-skill" id="continue-toggle">
+                    <h3>Continue Learning</h3>
+                    <p>Pick up where you left off</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="skills-container" class="mb-4" style="display: none;">
+            <h3>Your Skills</h3>
+            <div id="skill-list">
+                {% if skills %}
+                    {% for skill in skills %}
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5>{{ skill.skill_name }}</h5>
+                            <p class="text-muted">{{ skill.description }}</p>
+                            <div class="progress mb-2">
+                                <div class="progress-bar" role="progressbar" data-progress="{{ skill.overall_progress }}"
+                                     aria-valuenow="{{ skill.overall_progress }}" aria-valuemin="0" aria-valuemax="100">
+                                    {{ skill.overall_progress }}%
+                                </div>
+                            </div>
+                            <a href="{{ url_for('view_skill', skill_id=skill.skill_name) }}" class="btn btn-outline-primary mt-2">Continue</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info">
+                        No skills found. Start learning a new skill!
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const continueToggle = document.getElementById('continue-toggle');
+            const skillsContainer = document.getElementById('skills-container');
+            
+            continueToggle.addEventListener('click', function() {
+                if (skillsContainer.style.display === 'none') {
+                    skillsContainer.style.display = 'block';
+                } else {
+                    skillsContainer.style.display = 'none';
+                }
+            });
+        });
+        const progressBars = document.querySelectorAll('.progress-bar');
+        progressBars.forEach(bar => {
+            const progress = bar.getAttribute('data-progress');
+            bar.style.width = `${progress}%`;
+        });
+    </script>
+</body>
+</html>

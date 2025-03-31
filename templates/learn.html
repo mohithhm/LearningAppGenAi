@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learn a New Skill - Gemini Learning Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gemini Learning Assistant</h1>
+        </header>
+        
+        <div class="learn-form">
+            <h2>What would you like to learn?</h2>
+            <form action="{{ url_for('learn') }}" method="post">
+                <div class="chat-interface">
+                    <input type="text" name="skill" id="skill" placeholder="Enter a skill or topic..." required>
+                    <button type="submit" class="button">Create Learning Plan</button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="navigation">
+            <a href="{{ url_for('index') }}" class="back-button">Back to Home</a>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ skill.skill_name }} - Step {{ step_index + 1 }} - Gemini Learning Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gemini Learning Assistant</h1>
+        </header>
+        
+        <div class="step-detail">
+            <div class="skill-info">
+                <h2>{{ skill.skill_name }} - Step {{ step_index + 1 }}</h2>
+                <h3>{{ step.title }}</h3>
+            </div>
+            
+            <div class="step-content">
+                <div class="explanation">
+                    <h4>Explanation</h4>
+                    <div class="content">{{ step.explanation|safe }}</div>
+                </div>
+                
+                <div class="exercise">
+                    <h4>Exercise</h4>
+                    <div class="content">{{ step.exercise|safe }}</div>
+                </div>
+                
+                <div class="tip">
+                    <h4>Tip</h4>
+                    <div class="content">{{ step.tip|safe }}</div>
+                </div>
+            </div>
+            
+            {% if step.sub_steps and step.sub_steps|length > 0 %}
+                <div class="sub-steps">
+                    <h4>Sub-steps</h4>
+                    {% for sub_step in step.sub_steps %}
+                        <div class="sub-step">
+                            <h5>{{ sub_step.title }}</h5>
+                            <div class="sub-step-content">
+                                <div class="explanation">
+                                    <h6>Explanation</h6>
+                                    <div class="content">{{ sub_step.explanation|safe }}</div>
+                                </div>
+                                
+                                <div class="exercise">
+                                    <h6>Exercise</h6>
+                                    <div class="content">{{ sub_step.exercise|safe }}</div>
+                                </div>
+                                
+                                <div class="tip">
+                                    <h6>Tip</h6>
+                                    <div class="content">{{ sub_step.tip|safe }}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="progress-update">
+                                <button class="status-button not-started" data-status="not_started" data-substep="{{ loop.index0 }}">Not Started</button>
+                                <button class="status-button in-progress" data-status="in_progress" data-substep="{{ loop.index0 }}">In Progress</button>
+                                <button class="status-button completed" data-status="completed" data-substep="{{ loop.index0 }}">Completed</button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            <div class="progress-update">
+                <h4>Update Progress</h4>
+                <div class="status-buttons">
+                    <button class="status-button not-started" data-status="not_started">Not Started</button>
+                    <button class="status-button in-progress" data-status="in_progress">In Progress</button>
+                    <button class="status-button completed" data-status="completed">Completed</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="navigation">
+            {% if prev_step_index is not none %}
+                <a href="{{ url_for('view_step', skill_id=skill.skill_name, step_index=prev_step_index) }}" class="nav-button prev">Previous Step</a>
+            {% endif %}
+            
+            <a href="{{ url_for('view_skill', skill_id=skill.skill_name) }}" class="nav-button back">Back to Skill</a>
+            
+            {% if next_step_index is not none %}
+                <a href="{{ url_for('view_step', skill_id=skill.skill_name, step_index=next_step_index) }}" class="nav-button next">Next Step</a>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
