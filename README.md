@@ -35,7 +35,7 @@ A Flask-based educational web application powered by Google's Gemini API that cr
 
 ## Project Structure
 
-```bash
+```
 LearningAppGenAi/
 ├── app.py                      # Main Flask application
 ├── templates/                  # HTML templates
@@ -50,3 +50,25 @@ LearningAppGenAi/
 ├── user_data/                  # Stores per-user learning data as JSON
 ├── .env                        # Store your GEMINI_API_KEY here (optional)
 └── README.md
+```
+---
+
+## Setup Instructions
+1. Clone the repository:
+   
+   git clone https://github.com/mohithhm/LearningAppGenAi.git
+   
+   cd LearningAppGenAi
+2. Install dependencies:
+   
+   pip install flask requests python-dotenv
+3. Setup env variables: Create a .env file and add these
+
+   GEMINI_API_KEY=your_api_key_here
+
+   SECRET_KEY=your_flask_secret_key
+4. Run the app:
+
+   python app.py
+
+   
