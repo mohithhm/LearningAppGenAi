@@ -55,20 +55,21 @@ LearningAppGenAi/
 
 ## Setup Instructions
 1. Clone the repository:
-   
+   ```bash
    git clone https://github.com/mohithhm/LearningAppGenAi.git
-   
    cd LearningAppGenAi
+   ```
 2. Install dependencies:
-   
+   ```bash
    pip install flask requests python-dotenv
+   ```
 3. Setup env variables: Create a .env file and add these
-
+   ```bash
    GEMINI_API_KEY=your_api_key_here
-
    SECRET_KEY=your_flask_secret_key
+   ```
 4. Run the app:
-
+   ```bash
    python app.py
-
+   ```
    
